@@ -459,11 +459,11 @@ function showClientQR() {
   if (!currentClientId) return;
   const display = document.getElementById('qr-display');
   display.innerHTML = '';
-  new QRCode(display, {
+ new QRCode(display, {
     text: 'REELS_STAMP:' + currentClientId,
     width: 200, height: 200,
-    colorDark: '#E91E8C', colorLight: '#0e0e0e',
-    correctLevel: QRCode.CorrectLevel.H
+    colorDark: '#000000', colorLight: '#ffffff',
+
   });
   document.getElementById('qr-modal').classList.add('active');
 }
