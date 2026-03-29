@@ -684,12 +684,13 @@ async function startScanner() {
       stopScanner(); return;
     }
     const camera = cameras.find(c =>
-      c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('tras') ||
-      c.label.toLowerCase().includes('rear') || c.label.toLowerCase().includes('environment')
-    ) || cameras[cameras.length - 1];
+  c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('tras') ||
+  c.label.toLowerCase().includes('rear') || c.label.toLowerCase().includes('environment')
+) || cameras[0];
+
     await qrScanner.start(
       camera.id,
-      { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+      { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0, focusMode: "continuous" },
       (decodedText) => { if (!isScanning) return; handleQRResult(decodedText, status); },
       () => {}
     );
