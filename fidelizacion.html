@@ -758,12 +758,15 @@ function deleteClient(clientId) {
     renderClientsList();
   }
 }
+// ═══════════════════════════════════════════════════
+// ESCÁNER QR — Fix con Html5Qrcode directo
+// ═══════════════════════════════════════════════════
+let qrScanner = null;
+let isScanning = false;
 
-// ═══════════════════════════════════════════════════
-// ESCÁNER QR
-// ═══════════════════════════════════════════════════
-function startScanner() {
+async function startScanner() {
   const container = document.getElementById('scanner-container');
+  const region = document.getElementById('html5qr-code-full-region');
   const status = document.getElementById('scanner-status');
   const btnStart = document.getElementById('btn-start-scan');
   const btnStop = document.getElementById('btn-stop-scan');
@@ -771,55 +774,98 @@ function startScanner() {
   container.style.display = 'block';
   btnStart.style.display = 'none';
   btnStop.style.display = 'block';
-  status.textContent = 'Apunta al QR de la clienta...';
+  status.textContent = 'Iniciando cámara...';
   status.className = 'scanner-status';
 
+  // Limpiar instancia anterior
   if (qrScanner) {
-    try { qrScanner.clear(); } catch(e) {}
+    try { await qrScanner.stop(); } catch(e) {}
+    try { await qrScanner.clear(); } catch(e) {}
+    qrScanner = null;
   }
+  region.innerHTML = '';
 
-  qrScanner = new Html5QrcodeScanner('html5qr-code-full-region', {
-    fps: 10,
-    qrbox: { width: 220, height: 220 },
-    aspectRatio: 1,
-    showTorchButtonIfSupported: true,
-    showZoomSliderIfSupported: false,
-    defaultZoomValueIfSupported: 1.5
-  }, false);
+  try {
+    qrScanner = new Html5Qrcode('html5qr-code-full-region');
 
-  qrScanner.render(
-    (decodedText) => {
-      if (decodedText.startsWith('REELS_STAMP:')) {
-        const clientId = decodedText.replace('REELS_STAMP:', '');
-        const clients = getClients();
-        if (clients[clientId]) {
-          stopScanner();
-          status.textContent = '✓ Clienta identificada: ' + clients[clientId].name;
-          status.className = 'scanner-status success';
-          pendingStampClientId = clientId;
-          document.getElementById('pin-client-name-label').textContent = 'Sellar visita de ' + clients[clientId].name;
-          document.getElementById('pin-input').value = '';
-          document.getElementById('pin-error').style.display = 'none';
-          document.getElementById('pin-modal').classList.add('active');
-          setTimeout(() => document.getElementById('pin-input').focus(), 300);
-        } else {
-          status.textContent = '⚠ QR no reconocido. ¿Fue creado en otro dispositivo?';
-          status.className = 'scanner-status error';
-        }
-      } else {
-        status.textContent = '⚠ QR no es de Réels. Intenta de nuevo.';
-        status.className = 'scanner-status error';
-      }
-    },
-    (error) => { /* ignorar errores de escaneo continuo */ }
-  );
+    const cameras = await Html5Qrcode.getCameras();
+    if (!cameras || cameras.length === 0) {
+      status.textContent = '⚠ No se encontró cámara disponible.';
+      status.className = 'scanner-status error';
+      stopScanner();
+      return;
+    }
+
+    // Preferir cámara trasera
+    const camera = cameras.find(c =>
+      c.label.toLowerCase().includes('back') ||
+      c.label.toLowerCase().includes('tras') ||
+      c.label.toLowerCase().includes('rear') ||
+      c.label.toLowerCase().includes('environment')
+    ) || cameras[cameras.length - 1];
+
+    await qrScanner.start(
+      camera.id,
+      {
+        fps: 10,
+        qrbox: { width: 220, height: 220 },
+        aspectRatio: 1.0
+      },
+      (decodedText) => {
+        if (!isScanning) return;
+        handleQRResult(decodedText, status);
+      },
+      () => { /* errores de frame, ignorar */ }
+    );
+
+    isScanning = true;
+    status.textContent = 'Apunta al QR de la clienta 📷';
+    status.className = 'scanner-status';
+
+  } catch (err) {
+    console.error('Scanner error:', err);
+    status.textContent = '⚠ No se pudo acceder a la cámara. Verifica los permisos.';
+    status.className = 'scanner-status error';
+    stopScanner();
+  }
 }
 
-function stopScanner() {
+function handleQRResult(decodedText, status) {
+  isScanning = false;
+  stopScanner();
+
+  if (!decodedText.startsWith('REELS_STAMP:')) {
+    status.textContent = '⚠ QR no es de Réels. Intenta de nuevo.';
+    status.className = 'scanner-status error';
+    return;
+  }
+
+  const clientId = decodedText.replace('REELS_STAMP:', '');
+  const clients = getClients();
+
+  if (!clients[clientId]) {
+    status.textContent = '⚠ QR no reconocido. ¿La clienta está registrada en este dispositivo?';
+    status.className = 'scanner-status error';
+    return;
+  }
+
+  status.textContent = '✓ Clienta: ' + clients[clientId].name;
+  status.className = 'scanner-status success';
+
+  pendingStampClientId = clientId;
+  document.getElementById('pin-client-name-label').textContent =
+    'Sellar visita de ' + clients[clientId].name;
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').style.display = 'none';
+  document.getElementById('pin-modal').classList.add('active');
+  setTimeout(() => document.getElementById('pin-input').focus(), 300);
+}
+
+async function stopScanner() {
+  isScanning = false;
   if (qrScanner) {
-    try {
-      qrScanner.clear().catch(() => {});
-    } catch(e) {}
+    try { await qrScanner.stop(); } catch(e) {}
+    try { await qrScanner.clear(); } catch(e) {}
     qrScanner = null;
   }
   const container = document.getElementById('scanner-container');
