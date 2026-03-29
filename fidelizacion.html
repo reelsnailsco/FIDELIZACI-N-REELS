@@ -383,8 +383,9 @@ async function loadStampPass() {
 // ═══════════════════════════════════════════
 async function init() {
   const params   = new URLSearchParams(window.location.search);
-  const clientId = params.get('c');
+  const clientId = params.get('c') || localStorage.getItem('reels_client_id');
   if (clientId) {
+
     const client = await getClient(clientId);
     if (client) { currentClientId = clientId; showClientCard(client); }
     else showScreen('landing');
@@ -418,8 +419,10 @@ async function createClient() {
   if (!name) { errEl.textContent = 'Escribe tu nombre para continuar.'; errEl.style.display = 'block'; return; }
   const id = generateId();
   await saveClient(id, { name, stamps: 0, createdAt: new Date().toISOString() });
+  localStorage.setItem('reels_client_id', id);
   window.location.href = BASE_URL + '?c=' + id;
 }
+
 
 // ═══════════════════════════════════════════
 // TARJETA DE CLIENTA
