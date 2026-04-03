@@ -1321,14 +1321,15 @@ window.addEventListener('DOMContentLoaded', init);
       return;
     }
 
-    sendPasswordResetEmail(auth, email)      .then(() => {
-        alert("¡Listo! Te enviamos un correo. Al cambiar la clave, haz clic en el enlace para volver aquí.");
+    sendPasswordResetEmail(auth, email)
+      .then(() => {
+        alert("¡Listo! Te enviamos un correo. Al cambiar la clave, sigue las instrucciones de Google.");
       })
       .catch((error) => {
         console.error("Error:", error.code);
         alert("Hubo un error: " + error.message);
       });
-  };
+  }; // <--- ESTA LLAVE ES LA QUE FALTABA
 </script>
 
 </body>
