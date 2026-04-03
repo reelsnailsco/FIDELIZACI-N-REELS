@@ -1321,13 +1321,7 @@ window.addEventListener('DOMContentLoaded', init);
       return;
     }
 
-    const actionCodeSettings = {
-      url: 'https://reelsnailsco.github.io/FIDELIZACI-N-REELS/fidelizacion.html',
-      handleCodeInApp: true,
-    };
-
-    sendPasswordResetEmail(auth, email, actionCodeSettings)
-      .then(() => {
+    sendPasswordResetEmail(auth, email)      .then(() => {
         alert("¡Listo! Te enviamos un correo. Al cambiar la clave, haz clic en el enlace para volver aquí.");
       })
       .catch((error) => {
