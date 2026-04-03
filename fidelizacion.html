@@ -703,6 +703,12 @@ async function getClient(id) {
   const snap = await getDoc(doc(db,'clients',id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
+  async function getClientByEmail(email) {
+  const snap = await getDocs(query(collection(db,'clients'), orderBy('createdAt','desc')));
+  let found = null;
+  snap.forEach(d => { if (d.data().email === email) found = { id: d.id, ...d.data() }; });
+  return found;
+}
 
 async function getAllClients() {
   const snap = await getDocs(query(collection(db,'clients'), orderBy('createdAt','desc')));
@@ -749,7 +755,7 @@ async function init() {
     return;
   }
 
-  const unsub2 = onAuthStateChanged(auth, async user => {
+ const unsub2 = onAuthStateChanged(auth, async user => {
     unsub2();
     if (!user) { showScreen('landing'); return; }
     if (user.email === ADMIN_EMAIL) {
@@ -757,11 +763,11 @@ async function init() {
       renderClientsList();
       return;
     }
-    const client = await getClient(user.uid);
-    if (client) {
-      currentClientId = user.uid;
-      showClientCard(client);
-    } else {
+    let client = await getClient(user.uid);
+    if (!client) {
+      client = await getClientByEmail(user.email);
+    }
+    if (!client) {
       await saveClient(user.uid, {
         uid: user.uid,
         name: user.displayName || user.email.split('@')[0],
@@ -769,13 +775,12 @@ async function init() {
         stamps: 0,
         createdAt: new Date().toISOString()
       });
-      currentClientId = user.uid;
-      const newClient = await getClient(user.uid);
-      showClientCard(newClient);
+      client = await getClient(user.uid);
     }
+    currentClientId = client.id;
+    showClientCard(client);
   });
 }
-
 // ══════════════════════════════════════════
 // REGISTRO CLIENTA
 // ══════════════════════════════════════════
@@ -853,7 +858,7 @@ async function loginClient() {
       });
       client = await getClient(user.uid);
     }
-    currentClientId = user.uid;
+    currentClientId = client.id;
     showClientCard(client);
   } catch(e) {
     const msgs = {
