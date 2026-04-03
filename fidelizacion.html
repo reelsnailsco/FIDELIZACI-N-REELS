@@ -611,6 +611,7 @@ const BASE_URL    = window.location.origin + window.location.pathname;
 let pendingStampId     = null;
 let pendingStampClient = null;
 let currentClientId    = null;
+  let adminCredentials = null; // guardado en memoria durante la sesión
 
 // ══════════════════════════════════════════
 // AUTO LOGOUT — 5 minutos de inactividad
@@ -738,6 +739,10 @@ async function getAllClients() {
 async function saveClient(id, data) { await setDoc(doc(db,'clients',id), data); }
 async function updateClientStamps(id, stamps) { await updateDoc(doc(db,'clients',id), { stamps, lastStamp: new Date().toISOString() }); }
 async function removeClient(id) { await deleteDoc(doc(db,'clients',id)); }
+  async function saveNote(clientId, note) {
+  await updateDoc(doc(db,'clients',clientId), { notes: note });
+  showToast('Nota guardada ✦', 'success');
+}
 
 // ══════════════════════════════════════════
 // ROUTER
@@ -1015,6 +1020,7 @@ async function checkAdminPass() {
   const btn   = document.getElementById('btn-login');
   errEl.style.display = 'none';
   btn.textContent = 'Entrando...'; btn.disabled = true;
+  adminCredentials = { email, pass };
   try {
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     if (cred.user.email !== ADMIN_EMAIL) {
@@ -1081,9 +1087,17 @@ function renderFilteredClients(ids, clients) {
       <div class="client-info" style="min-width:0;">
         <div class="client-name-text">${c.name}</div>
         <div class="client-count">${c.stamps}/6 sellos · ${c.stamps>=6?'🎉 Premio listo':'activa'}</div>
-        ${c.email ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">${c.email}</div>` : ''}
+       ${c.email  ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">✉️ ${c.email}</div>` : ''}
+${c.phone  ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">📞 ${c.phone}</div>` : ''}
+${c.cedula ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">🪪 ${c.cedula}</div>` : ''}
         <div style="font-size:0.67rem;color:rgba(255,255,255,0.22);margin-top:0.1rem;">última visita: ${lastTxt}</div>
         <div class="client-stamps-mini" style="margin-top:0.4rem;">${mini}</div>
+        ${c.notes ? `<div style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-top:0.4rem;font-style:italic;">📝 ${c.notes}</div>` : ''}
+<div style="margin-top:0.5rem;">
+  <input type="text" placeholder="Agregar nota…" value="${c.notes||''}"
+    style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:0.5rem;padding:0.4rem 0.7rem;color:#fff;font-size:0.72rem;font-family:'DM Sans',sans-serif;outline:none;"
+   onchange="saveNote('${id}', this.value)">
+</div>
       </div>
       <div class="client-actions">
         <button class="btn-stamp" title="Agregar sello" onclick="requestStamp('${id}')">✦</button>
@@ -1103,9 +1117,7 @@ function filterClients(q) {
   renderFilteredClients(ids, allClientsCache);
 }
 
-function copyLink(url) {
-  navigator.clipboard.writeText(url).then(() => showToast('Link copiado ✦', 'success'));
-}
+
 async function adminRegisterClient() {
   const name   = document.getElementById('nc-name').value.trim();
   const cedula = document.getElementById('nc-cedula').value.trim();
@@ -1143,11 +1155,13 @@ async function adminRegisterClient() {
     ['nc-name','nc-cedula','nc-phone','nc-email','nc-pass'].forEach(id => {
       document.getElementById(id).value = '';
     });
-    // La clienta queda en su sesión y ve su tarjeta
-    const client = await getClient(cred.user.uid);
-    currentClientId = cred.user.uid;
-    showClientCard(client);
-    showToast('¡Cuenta creada exitosamente! 💅', 'success');
+  await signOut(auth);
+    if (adminCredentials) {
+      await signInWithEmailAndPassword(auth, adminCredentials.email, adminCredentials.pass);
+    }
+    showToast('¡Clienta registrada! 💅', 'success');
+    switchAdminTab('clients', document.querySelector('.admin-tab'));
+    renderClientsList();
   } catch(e) {
     const msgs = {
       'auth/email-already-in-use': 'Este email ya tiene una cuenta.',
@@ -1229,7 +1243,7 @@ Object.assign(window, {
   switchAdminTab, adminRegisterClient, requestStamp, redeemReward, deleteClient,
   showClientQR, closeQRModal,
   doStamp, stampLogin,
-  filterClients, copyLink
+  filterClients, copyLink, saveNote
 });
 
 window.addEventListener('DOMContentLoaded', init);
