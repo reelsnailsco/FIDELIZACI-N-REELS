@@ -364,6 +364,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
     <div class="reward-title">¡Manicure gratis!</div>
     <div class="reward-desc">Completaste 6 servicios. Muéstrale esto a Johanna para canjear tu premio 💅</div>
   </div>
+  <p id="card-last-visit" style="font-size:0.72rem;color:var(--gray);text-align:center;margin-bottom:1rem;"></p>
   <button class="show-qr-btn" id="btn-show-qr" onclick="showClientQR()">
     📱 Mostrar mi QR para sellar
   </button>
@@ -476,6 +477,12 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
     <button class="admin-tab" onclick="switchAdminTab('new',this)">+ Nueva</button>
   </div>
   <div id="admin-panel-clients" class="admin-panel active">
+   <div id="admin-stats" style="display:flex;gap:0.8rem;margin-bottom:1.2rem;"></div>
+    <div style="position:relative;margin-bottom:1rem;">
+      <span style="position:absolute;left:0.8rem;top:50%;transform:translateY(-50%);color:#888;pointer-events:none;">🔍</span>
+      <input id="client-search" type="text" placeholder="Buscar clienta…" oninput="filterClients(this.value)"
+        style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:0.8rem;padding:0.7rem 1rem 0.7rem 2.4rem;color:#fff;font-size:0.85rem;font-family:'DM Sans',sans-serif;outline:none;">
+    </div>
     <p class="section-label">Mis clientas</p>
     <div id="clients-list"><div class="loading-state"><div class="loading-spinner"></div>Cargando...</div></div>
   </div>
@@ -684,7 +691,7 @@ async function getAllClients() {
   return r;
 }
 async function saveClient(id, data) { await setDoc(doc(db,'clients',id), data); }
-async function updateClientStamps(id, stamps) { await updateDoc(doc(db,'clients',id), { stamps }); }
+async function updateClientStamps(id, stamps) { await updateDoc(doc(db,'clients',id), { stamps, lastStamp: new Date().toISOString() }); }
 async function removeClient(id) { await deleteDoc(doc(db,'clients',id)); }
 
 // ══════════════════════════════════════════
@@ -860,6 +867,11 @@ function showClientCard(client) {
   renderStamps(client.stamps);
   document.getElementById('reward-box').style.display  = client.stamps >= 6 ? 'block' : 'none';
   document.getElementById('btn-show-qr').style.display = client.stamps >= 6 ? 'none'  : 'block';
+  const lvEl = document.getElementById('card-last-visit');
+  if (client.lastStamp) {
+    const days = Math.floor((Date.now() - new Date(client.lastStamp)) / 86400000);
+    lvEl.textContent = days === 0 ? '✦ Última visita: hoy' : days === 1 ? '✦ Última visita: ayer' : `✦ Última visita: hace ${days} días`;
+  } else { lvEl.textContent = ''; }
   showScreen('card');
 }
 function renderStamps(count) {
@@ -982,33 +994,72 @@ function switchAdminTab(name, btn) {
   document.getElementById('admin-panel-'+name).classList.add('active');
   if (name === 'clients') renderClientsList();
 }
+let allClientsCache = {};
+
 async function renderClientsList() {
   const list = document.getElementById('clients-list');
   list.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>Cargando...</div>';
   const clients = await getAllClients();
+  allClientsCache = clients;
   const ids = Object.keys(clients);
+  // Stats
+  const statsEl = document.getElementById('admin-stats');
+  if (statsEl) {
+    const total = ids.length;
+    const prizes = ids.filter(id => clients[id].stamps >= 6).length;
+    statsEl.innerHTML = `
+      <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:0.8rem;padding:0.8rem;text-align:center;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--pink);line-height:1;">${total}</div>
+        <div style="font-size:0.62rem;color:#888;margin-top:0.2rem;">clientas</div>
+      </div>
+      <div style="flex:1;background:rgba(255,255,255,0.03);border:1px solid rgba(255,215,0,0.2);border-radius:0.8rem;padding:0.8rem;text-align:center;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:#FFD700;line-height:1;">${prizes}</div>
+        <div style="font-size:0.62rem;color:#888;margin-top:0.2rem;">premios listos</div>
+      </div>`;
+  }
   if (!ids.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">💅</div><p>Aún no hay clientas registradas.</p></div>';
     return;
   }
+  renderFilteredClients(ids, clients);
+}
+
+function renderFilteredClients(ids, clients) {
+  const list = document.getElementById('clients-list');
+  if (!ids.length) { list.innerHTML = '<div class="empty-state"><p>Sin resultados.</p></div>'; return; }
   list.innerHTML = ids.map(id => {
     const c   = clients[id];
     const url = BASE_URL + '?c=' + id;
     const mini = Array.from({length:6},(_,i) => `<div class="stamp-mini ${i<c.stamps?'filled':''}"></div>`).join('');
+    const lastTxt = c.lastStamp ? (() => { const d = Math.floor((Date.now()-new Date(c.lastStamp))/86400000); return d===0?'hoy':d===1?'ayer':`hace ${d} días`; })() : 'sin visitas';
     return `<div class="client-item" id="ci-${id}">
-      <div class="client-info">
+      <div class="client-info" style="min-width:0;">
         <div class="client-name-text">${c.name}</div>
         <div class="client-count">${c.stamps}/6 sellos · ${c.stamps>=6?'🎉 Premio listo':'activa'}</div>
-        ${c.email ? `<div class="client-email-text">${c.email}</div>` : ''}
+        ${c.email ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">${c.email}</div>` : ''}
+        <div style="font-size:0.67rem;color:rgba(255,255,255,0.22);margin-top:0.1rem;">última visita: ${lastTxt}</div>
         <div class="client-stamps-mini" style="margin-top:0.4rem;">${mini}</div>
       </div>
       <div class="client-actions">
         <button class="btn-stamp" title="Agregar sello" onclick="requestStamp('${id}')">✦</button>
         <button class="btn-redeem ${c.stamps>=6?'ready':''}" title="Canjear" onclick="redeemReward('${id}')">🎁</button>
+        <button style="background:none;border:1px solid rgba(255,255,255,0.07);color:rgba(255,255,255,0.25);width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:0.8rem;display:flex;align-items:center;justify-content:center;" title="Copiar link" onclick="copyLink('${url}')">🔗</button>
         <button class="btn-delete" title="Eliminar" onclick="deleteClient('${id}')">✕</button>
       </div>
     </div>`;
   }).join('');
+}
+
+function filterClients(q) {
+  const ids = Object.keys(allClientsCache).filter(id =>
+    allClientsCache[id].name.toLowerCase().includes(q.toLowerCase()) ||
+    (allClientsCache[id].email||'').toLowerCase().includes(q.toLowerCase())
+  );
+  renderFilteredClients(ids, allClientsCache);
+}
+
+function copyLink(url) {
+  navigator.clipboard.writeText(url).then(() => showToast('Link copiado ✦', 'success'));
 }
 async function adminCreateClient() {
   const name   = document.getElementById('new-client-name').value.trim();
@@ -1095,7 +1146,8 @@ Object.assign(window, {
   checkAdminPass, adminLogout,
   switchAdminTab, adminCreateClient, requestStamp, redeemReward, deleteClient,
   showClientQR, closeQRModal,
-  doStamp, stampLogin
+  doStamp, stampLogin,
+  filterClients, copyLink
 });
 
 window.addEventListener('DOMContentLoaded', init);
