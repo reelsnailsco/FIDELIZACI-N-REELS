@@ -474,7 +474,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   </div>
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="switchAdminTab('clients',this)">Clientas</button>
-    <button class="admin-tab" onclick="switchAdminTab('new',this)">+ Nueva clienta</button>
+    <button class="admin-tab" onclick="switchAdminTab('new',this)">+ Nueva</button>
   </div>
   <div id="admin-panel-clients" class="admin-panel active">
    <div id="admin-stats" style="display:flex;gap:0.8rem;margin-bottom:1.2rem;"></div>
@@ -487,44 +487,19 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
     <div id="clients-list"><div class="loading-state"><div class="loading-spinner"></div>Cargando...</div></div>
   </div>
   <div id="admin-panel-new" class="admin-panel">
-  <p class="section-label">Registrar nueva clienta</p>
-  <div class="new-client-form">
-    <p style="color:var(--gray);font-size:0.8rem;margin-bottom:1.2rem;line-height:1.5;">
-      Pásale el teléfono a la clienta para que llene sus datos. Se creará su cuenta y podrá entrar desde su propio dispositivo después.
-    </p>
-    <div class="form-group">
-      <label class="form-label">Nombre completo *</label>
-      <input type="text" id="nc-name" class="form-input" placeholder="Ej: Laura Martínez" autocomplete="name">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Cédula *</label>
-      <input type="text" id="nc-cedula" class="form-input" placeholder="Número de cédula" inputmode="numeric">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Teléfono *</label>
-      <input type="tel" id="nc-phone" class="form-input" placeholder="Ej: 3001234567" inputmode="numeric" autocomplete="tel">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Email *</label>
-      <input type="email" id="nc-email" class="form-input" placeholder="tu@email.com" autocomplete="email">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Contraseña *</label>
-      <div class="pass-wrap">
-        <input type="password" id="nc-pass" class="form-input" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-        <button type="button" class="pass-toggle" onclick="togglePass('nc-pass',this)" aria-label="Mostrar/ocultar contraseña" tabindex="-1">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
+    <p class="section-label">Agregar clienta manualmente</p>
+    <div class="new-client-form">
+      <p style="color:var(--gray);font-size:0.8rem;margin-bottom:1.2rem;line-height:1.5;">
+        Crea una tarjeta para una clienta sin que ella tenga que registrarse. Le puedes enviar el link por WhatsApp.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Nombre de la clienta</label>
+        <input type="text" id="new-client-name" class="form-input" placeholder="Ej: Laura Martínez">
       </div>
+      <button class="btn-primary" onclick="adminCreateClient()">Crear tarjeta sin cuenta ✦</button>
+      <p id="new-client-result" style="margin-top:0.8rem;font-size:0.8rem;color:var(--gray);"></p>
     </div>
-    <p id="nc-error" style="color:#ff6b6b;font-size:0.78rem;margin-bottom:0.8rem;display:none;"></p>
-    <button class="btn-primary" id="btn-nc" onclick="adminRegisterClient()">Crear mi cuenta ✦</button>
-   <p style="font-size:0.68rem;color:var(--gray);text-align:center;margin-top:0.8rem;">* Todos los campos son obligatorios</p>
   </div>
-</div>
-
 </div>
 
 <!-- ══ MODAL QR ══ -->
@@ -586,7 +561,6 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile,
   sendPasswordResetEmail,
   signOut,
   onAuthStateChanged
@@ -611,26 +585,6 @@ const BASE_URL    = window.location.origin + window.location.pathname;
 let pendingStampId     = null;
 let pendingStampClient = null;
 let currentClientId    = null;
-  let adminCredentials = null; // guardado en memoria durante la sesión
-
-// ══════════════════════════════════════════
-// AUTO LOGOUT — 5 minutos de inactividad
-// ══════════════════════════════════════════
-let inactivityTimer;
-function resetInactivityTimer() {
-  clearTimeout(inactivityTimer);
-  inactivityTimer = setTimeout(async () => {
-    if (auth.currentUser && auth.currentUser.email !== ADMIN_EMAIL) {
-      await signOut(auth);
-      currentClientId = null;
-      showScreen('landing');
-      showToast('Sesión cerrada por inactividad', 'error');
-    }
-  }, 5 * 60 * 1000); // 5 minutos
-}
-['click','touchstart','keydown','scroll'].forEach(e =>
-  document.addEventListener(e, resetInactivityTimer)
-);
 
 // ══════════════════════════════════════════
 // TOGGLE CONTRASEÑA (OJO) — accesible desde HTML
@@ -714,44 +668,14 @@ async function sendReset() {
   }
 }
 
-  async function confirmNewPass(oobCode) {
-  const { confirmPasswordReset } = await import(
-    "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"
-  );
-  const pass  = document.getElementById('new-pass-input').value;
-  const errEl = document.getElementById('reset-error');
-  errEl.style.display = 'none';
-  if (pass.length < 6) {
-    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
-    errEl.style.display = 'block';
-    return;
-  }
-  try {
-    await confirmPasswordReset(auth, oobCode, pass);
-    document.getElementById('reset-modal-form').style.display = 'none';
-    document.getElementById('reset-modal-success').style.display = 'block';
-    document.getElementById('reset-modal-sub').textContent = '¡Contraseña actualizada!';
-    showToast('Contraseña cambiada. Ya puedes iniciar sesión 💅', 'success');
-  } catch(e) {
-    errEl.textContent = 'El enlace expiró. Pide uno nuevo.';
-    errEl.style.display = 'block';
-  }
-}
-
 // ══════════════════════════════════════════
 // HELPERS FIRESTORE
 // ══════════════════════════════════════════
-
+const generateId = () => Math.random().toString(36).substr(2,10) + Date.now().toString(36);
 
 async function getClient(id) {
   const snap = await getDoc(doc(db,'clients',id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-}
-  async function getClientByEmail(email) {
-  const snap = await getDocs(query(collection(db,'clients'), orderBy('createdAt','desc')));
-  let found = null;
-  snap.forEach(d => { if (d.data().email === email) found = { id: d.id, ...d.data() }; });
-  return found;
 }
 async function getClientByUid(uid) {
   const q    = query(collection(db,'clients'), where('uid','==',uid));
@@ -769,39 +693,15 @@ async function getAllClients() {
 async function saveClient(id, data) { await setDoc(doc(db,'clients',id), data); }
 async function updateClientStamps(id, stamps) { await updateDoc(doc(db,'clients',id), { stamps, lastStamp: new Date().toISOString() }); }
 async function removeClient(id) { await deleteDoc(doc(db,'clients',id)); }
-  async function saveNote(clientId, note) {
-  await updateDoc(doc(db,'clients',clientId), { notes: note });
-  showToast('Nota guardada ✦', 'success');
-}
 
 // ══════════════════════════════════════════
 // ROUTER
 // ══════════════════════════════════════════
 async function init() {
- const params   = new URLSearchParams(window.location.search);
+  const params   = new URLSearchParams(window.location.search);
   const stampId  = params.get('stamp');
   const clientId = params.get('c');
-  const mode     = params.get('mode');
-  const oobCode  = params.get('oobCode');
 
-  if (mode === 'resetPassword' && oobCode) {
-    showScreen('client-login');
-    openResetModal();
-    document.getElementById('reset-modal-sub').textContent =
-      'Escribe tu nueva contraseña para recuperar tu cuenta.';
-    document.getElementById('reset-modal-form').innerHTML = `
-      <div class="form-group" style="text-align:left;margin-bottom:1rem;">
-        <label class="form-label">Nueva contraseña</label>
-        <div class="pass-wrap">
-          <input type="password" id="new-pass-input" class="form-input"
-                 placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-        </div>
-      </div>
-      <p id="reset-error" style="color:#ff6b6b;font-size:0.78rem;margin-bottom:0.8rem;display:none;"></p>
-      <button class="btn-primary" onclick="confirmNewPass('${oobCode}')">Guardar contraseña ✦</button>
-    `;
-    return;
-  }
   if (stampId) {
     showScreen('stamp');
     stampState('loading');
@@ -829,7 +729,7 @@ async function init() {
     return;
   }
 
- const unsub2 = onAuthStateChanged(auth, async user => {
+  const unsub2 = onAuthStateChanged(auth, async user => {
     unsub2();
     if (!user) { showScreen('landing'); return; }
     if (user.email === ADMIN_EMAIL) {
@@ -837,23 +737,26 @@ async function init() {
       renderClientsList();
       return;
     }
-   let client = await getClientByUid(user.uid);
-    if (!client) client = await getClientByEmail(user.email);
-   
-    if (!client) {
-      await saveClient(user.uid, {
+    const client = await getClientByUid(user.uid);
+    if (client) {
+      currentClientId = client.id;
+      showClientCard(client);
+    } else {
+      const id = generateId();
+      await saveClient(id, {
         uid: user.uid,
         name: user.displayName || user.email.split('@')[0],
         email: user.email,
         stamps: 0,
         createdAt: new Date().toISOString()
       });
-      client = await getClient(user.uid);
+      currentClientId = id;
+      const newClient = await getClient(id);
+      showClientCard(newClient);
     }
-    currentClientId = client.id;
-    showClientCard(client);
   });
 }
+
 // ══════════════════════════════════════════
 // REGISTRO CLIENTA
 // ══════════════════════════════════════════
@@ -872,17 +775,17 @@ async function registerClient() {
   btn.disabled = true; btn.textContent = 'Creando cuenta…';
 
   try {
-   const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await updateProfile(cred.user, { displayName: name });
-    await saveClient(cred.user.uid, {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const id   = generateId();
+    await saveClient(id, {
       uid: cred.user.uid,
       name,
       email,
       stamps: 0,
       createdAt: new Date().toISOString()
     });
-    currentClientId = cred.user.uid;
-    const client = await getClient(cred.user.uid);
+    currentClientId = id;
+    const client = await getClient(id);
     showClientCard(client);
     // El navegador habrá preguntado por el llavero al crear la cuenta
   } catch(e) {
@@ -920,18 +823,17 @@ async function loginClient() {
       return;
     }
 
-   let client = await getClientByUid(user.uid);
-    if (!client) client = await getClientByEmail(user.email);
+    let client = await getClientByUid(user.uid);
     if (!client) {
-      await saveClient(user.uid, {
-        
+      const id = generateId();
+      await saveClient(id, {
         uid: user.uid,
         name: user.displayName || email.split('@')[0],
         email,
         stamps: 0,
         createdAt: new Date().toISOString()
       });
-      client = await getClient(user.uid);
+      client = await getClient(id);
     }
     currentClientId = client.id;
     showClientCard(client);
@@ -1068,7 +970,6 @@ async function checkAdminPass() {
   const btn   = document.getElementById('btn-login');
   errEl.style.display = 'none';
   btn.textContent = 'Entrando...'; btn.disabled = true;
-  adminCredentials = { email, pass };
   try {
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     if (cred.user.email !== ADMIN_EMAIL) {
@@ -1135,17 +1036,9 @@ function renderFilteredClients(ids, clients) {
       <div class="client-info" style="min-width:0;">
         <div class="client-name-text">${c.name}</div>
         <div class="client-count">${c.stamps}/6 sellos · ${c.stamps>=6?'🎉 Premio listo':'activa'}</div>
-       ${c.email  ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">✉️ ${c.email}</div>` : ''}
-${c.phone  ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">📞 ${c.phone}</div>` : ''}
-${c.cedula ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">🪪 ${c.cedula}</div>` : ''}
+        ${c.email ? `<div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:0.1rem;">${c.email}</div>` : ''}
         <div style="font-size:0.67rem;color:rgba(255,255,255,0.22);margin-top:0.1rem;">última visita: ${lastTxt}</div>
         <div class="client-stamps-mini" style="margin-top:0.4rem;">${mini}</div>
-        ${c.notes ? `<div style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-top:0.4rem;font-style:italic;">📝 ${c.notes}</div>` : ''}
-<div style="margin-top:0.5rem;">
-  <input type="text" placeholder="Agregar nota…" value="${c.notes||''}"
-    style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:0.5rem;padding:0.4rem 0.7rem;color:#fff;font-size:0.72rem;font-family:'DM Sans',sans-serif;outline:none;"
-   onchange="saveNote('${id}', this.value)">
-</div>
       </div>
       <div class="client-actions">
         <button class="btn-stamp" title="Agregar sello" onclick="requestStamp('${id}')">✦</button>
@@ -1165,62 +1058,25 @@ function filterClients(q) {
   renderFilteredClients(ids, allClientsCache);
 }
 
-
-async function adminRegisterClient() {
-  const name   = document.getElementById('nc-name').value.trim();
-  const cedula = document.getElementById('nc-cedula').value.trim();
-  const phone  = document.getElementById('nc-phone').value.trim();
-  const email  = document.getElementById('nc-email').value.trim();
-  const pass   = document.getElementById('nc-pass').value;
-  const errEl  = document.getElementById('nc-error');
-  const btn    = document.getElementById('btn-nc');
-
-  errEl.style.display = 'none';
-
-  if (!name)           { errEl.textContent = 'El nombre es obligatorio.';      errEl.style.display = 'block'; return; }
-  if (!cedula)         { errEl.textContent = 'La cédula es obligatoria.';      errEl.style.display = 'block'; return; }
-  if (!/^\d{5,12}$/.test(cedula)) { errEl.textContent = 'La cédula debe tener entre 5 y 12 números.'; errEl.style.display = 'block'; return; }
-  if (!phone)          { errEl.textContent = 'El teléfono es obligatorio.';    errEl.style.display = 'block'; return; }
-  if (!/^\d{7,15}$/.test(phone))  { errEl.textContent = 'El teléfono debe tener entre 7 y 15 números.'; errEl.style.display = 'block'; return; }
-  if (!email)          { errEl.textContent = 'El email es obligatorio.';       errEl.style.display = 'block'; return; }
-  if (pass.length < 6) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; errEl.style.display = 'block'; return; }
-
-  btn.disabled = true; btn.textContent = 'Creando cuenta…';
-
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await updateProfile(cred.user, { displayName: name });
-    await saveClient(cred.user.uid, {
-      uid:       cred.user.uid,
-      name,
-      email,
-      phone,
-      cedula,
-      stamps:    0,
-      createdAt: new Date().toISOString()
-    });
-    // Limpiar campos
-    ['nc-name','nc-cedula','nc-phone','nc-email','nc-pass'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-  await signOut(auth);
-    if (adminCredentials) {
-      await signInWithEmailAndPassword(auth, adminCredentials.email, adminCredentials.pass);
-    }
-    showToast('¡Clienta registrada! 💅', 'success');
-    switchAdminTab('clients', document.querySelector('.admin-tab'));
-    renderClientsList();
-  } catch(e) {
-    const msgs = {
-      'auth/email-already-in-use': 'Este email ya tiene una cuenta.',
-      'auth/invalid-email':        'El email no es válido.',
-      'auth/weak-password':        'La contraseña es muy débil.'
-    };
-    errEl.textContent = msgs[e.code] || 'Hubo un error. Intenta de nuevo.';
-    errEl.style.display = 'block';
-  } finally {
-    btn.disabled = false; btn.textContent = 'Crear mi cuenta ✦';
-  }
+function copyLink(url) {
+  navigator.clipboard.writeText(url).then(() => showToast('Link copiado ✦', 'success'));
+}
+async function adminCreateClient() {
+  const name   = document.getElementById('new-client-name').value.trim();
+  const result = document.getElementById('new-client-result');
+  if (!name) { result.textContent = 'Escribe el nombre primero.'; return; }
+  result.textContent = 'Creando...';
+  const id = generateId();
+  await saveClient(id, { name, stamps: 0, createdAt: new Date().toISOString() });
+  const url = BASE_URL + '?c=' + id;
+  result.innerHTML = `✅ Creada. <a href="${url}" target="_blank" style="color:var(--pink)">Ver tarjeta</a>`;
+  document.getElementById('new-client-name').value = '';
+  setTimeout(() => { if (confirm(`¿Compartir el link de ${name} por WhatsApp?`)) shareLink(url, name); }, 300);
+}
+function shareLink(url, name) {
+  window.open('https://wa.me/?text=' + encodeURIComponent(
+    `Hola ${name}! 💅 Aquí está tu tarjeta de fidelización de Réels Nails Co: ${url}`
+  ), '_blank');
 }
 async function requestStamp(clientId) {
   if (!auth.currentUser) { showToast('Sesión expirada.', 'error'); return; }
@@ -1288,61 +1144,13 @@ Object.assign(window, {
   openResetModal, closeResetModal, sendReset,
   registerClient, loginClient, clientLogout,
   checkAdminPass, adminLogout,
-  switchAdminTab, adminRegisterClient, requestStamp, redeemReward, deleteClient,
- showClientQR, closeQRModal,
+  switchAdminTab, adminCreateClient, requestStamp, redeemReward, deleteClient,
+  showClientQR, closeQRModal,
   doStamp, stampLogin,
-  filterClients, copyLink, saveNote, confirmNewPass
+  filterClients, copyLink
 });
 
 window.addEventListener('DOMContentLoaded', init);
 </script>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getAuth, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-  // --- ESTO ACTIVA EL BOTÓN "YA TENGO CUENTA" ---
-  window.showLoginModal = function() {
-    const modal = document.getElementById('login-modal');
-    if (modal) modal.style.display = 'flex';
-  };
-
-  window.closeLoginModal = function() {
-    const modal = document.getElementById('login-modal');
-    if (modal) modal.style.display = 'none';
-  };
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBvVPZ2OMWnDYCwwn6Bw_Fn10fvfRvE9lo",
-    authDomain: "reelsnailsco-74294.firebaseapp.com",
-    projectId: "reelsnailsco-74294",
-    storageBucket: "reelsnailsco-74294.firebasestorage.app",
-    messagingSenderId: "664768682920",
-    appId: "1:664768682920:web:4ab1bb587ac9407c2fdb9d"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-
-  window.openResetModal = function() {
-    const emailInput = document.getElementById('cl-email');
-    const email = emailInput ? emailInput.value : '';
-    
-    if (!email) {
-      alert("Por favor, escribe tu email en el campo de inicio de sesión primero.");
-      return;
-    }
-
-    sendPasswordResetEmail(auth, email)
-      .then(() => {
-        alert("¡Listo! Te enviamos un correo. Al cambiar la clave, sigue las instrucciones de Google.");
-      })
-      .catch((error) => {
-        console.error("Error:", error.code);
-        alert("Hubo un error: " + error.message);
-      });
-  };
-</script>
-
 </body>
 </html>
