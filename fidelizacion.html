@@ -714,6 +714,30 @@ async function sendReset() {
   }
 }
 
+  async function confirmNewPass(oobCode) {
+  const { confirmPasswordReset } = await import(
+    "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"
+  );
+  const pass  = document.getElementById('new-pass-input').value;
+  const errEl = document.getElementById('reset-error');
+  errEl.style.display = 'none';
+  if (pass.length < 6) {
+    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    errEl.style.display = 'block';
+    return;
+  }
+  try {
+    await confirmPasswordReset(auth, oobCode, pass);
+    document.getElementById('reset-modal-form').style.display = 'none';
+    document.getElementById('reset-modal-success').style.display = 'block';
+    document.getElementById('reset-modal-sub').textContent = '¡Contraseña actualizada!';
+    showToast('Contraseña cambiada. Ya puedes iniciar sesión 💅', 'success');
+  } catch(e) {
+    errEl.textContent = 'El enlace expiró. Pide uno nuevo.';
+    errEl.style.display = 'block';
+  }
+}
+
 // ══════════════════════════════════════════
 // HELPERS FIRESTORE
 // ══════════════════════════════════════════
@@ -748,10 +772,30 @@ async function removeClient(id) { await deleteDoc(doc(db,'clients',id)); }
 // ROUTER
 // ══════════════════════════════════════════
 async function init() {
-  const params   = new URLSearchParams(window.location.search);
+ const params   = new URLSearchParams(window.location.search);
   const stampId  = params.get('stamp');
   const clientId = params.get('c');
+  const mode     = params.get('mode');
+  const oobCode  = params.get('oobCode');
 
+  if (mode === 'resetPassword' && oobCode) {
+    showScreen('client-login');
+    openResetModal();
+    document.getElementById('reset-modal-sub').textContent =
+      'Escribe tu nueva contraseña para recuperar tu cuenta.';
+    document.getElementById('reset-modal-form').innerHTML = `
+      <div class="form-group" style="text-align:left;margin-bottom:1rem;">
+        <label class="form-label">Nueva contraseña</label>
+        <div class="pass-wrap">
+          <input type="password" id="new-pass-input" class="form-input"
+                 placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </div>
+      </div>
+      <p id="reset-error" style="color:#ff6b6b;font-size:0.78rem;margin-bottom:0.8rem;display:none;"></p>
+      <button class="btn-primary" onclick="confirmNewPass('${oobCode}')">Guardar contraseña ✦</button>
+    `;
+    return;
+  }
   if (stampId) {
     showScreen('stamp');
     stampState('loading');
@@ -1243,7 +1287,7 @@ Object.assign(window, {
   switchAdminTab, adminRegisterClient, requestStamp, redeemReward, deleteClient,
   showClientQR, closeQRModal,
   doStamp, stampLogin,
-  filterClients, copyLink, saveNote
+  filterClients, copyLink, saveNote, confirmNewPass
 });
 
 window.addEventListener('DOMContentLoaded', init);
