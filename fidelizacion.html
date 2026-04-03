@@ -521,8 +521,10 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
     </div>
     <p id="nc-error" style="color:#ff6b6b;font-size:0.78rem;margin-bottom:0.8rem;display:none;"></p>
     <button class="btn-primary" id="btn-nc" onclick="adminRegisterClient()">Crear mi cuenta ✦</button>
-    <p style="font-size:0.68rem;color:var(--gray);text-align:center;margin-top:0.8rem;">* Todos los campos son obligatorios</p>
+   <p style="font-size:0.68rem;color:var(--gray);text-align:center;margin-top:0.8rem;">* Todos los campos son obligatorios</p>
   </div>
+</div>
+
 </div>
 
 <!-- ══ MODAL QR ══ -->
@@ -578,7 +580,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getFirestore, collection, doc,
   getDoc, getDocs, setDoc, updateDoc, deleteDoc,
-  query, orderBy, where
+  query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth,
@@ -695,19 +697,13 @@ async function sendReset() {
 // ══════════════════════════════════════════
 // HELPERS FIRESTORE
 // ══════════════════════════════════════════
-const generateId = () => Math.random().toString(36).substr(2,10) + Date.now().toString(36);
+
 
 async function getClient(id) {
   const snap = await getDoc(doc(db,'clients',id));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
-async function getClientByUid(uid) {
-  const q    = query(collection(db,'clients'), where('uid','==',uid));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const d = snap.docs[0];
-  return { id: d.id, ...d.data() };
-}
+
 async function getAllClients() {
   const snap = await getDocs(query(collection(db,'clients'), orderBy('createdAt','desc')));
   const r = {};
@@ -761,21 +757,20 @@ async function init() {
       renderClientsList();
       return;
     }
-    const client = await getClientByUid(user.uid);
+    const client = await getClient(user.uid);
     if (client) {
-      currentClientId = client.id;
+      currentClientId = user.uid;
       showClientCard(client);
     } else {
-      const id = generateId();
-      await saveClient(id, {
+      await saveClient(user.uid, {
         uid: user.uid,
         name: user.displayName || user.email.split('@')[0],
         email: user.email,
         stamps: 0,
         createdAt: new Date().toISOString()
       });
-      currentClientId = id;
-      const newClient = await getClient(id);
+      currentClientId = user.uid;
+      const newClient = await getClient(user.uid);
       showClientCard(newClient);
     }
   });
@@ -799,17 +794,17 @@ async function registerClient() {
   btn.disabled = true; btn.textContent = 'Creando cuenta…';
 
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    const id   = generateId();
-    await saveClient(id, {
+   const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, { displayName: name });
+    await saveClient(cred.user.uid, {
       uid: cred.user.uid,
       name,
       email,
       stamps: 0,
       createdAt: new Date().toISOString()
     });
-    currentClientId = id;
-    const client = await getClient(id);
+    currentClientId = cred.user.uid;
+    const client = await getClient(cred.user.uid);
     showClientCard(client);
     // El navegador habrá preguntado por el llavero al crear la cuenta
   } catch(e) {
@@ -847,19 +842,18 @@ async function loginClient() {
       return;
     }
 
-    let client = await getClientByUid(user.uid);
+   let client = await getClient(user.uid);
     if (!client) {
-      const id = generateId();
-      await saveClient(id, {
+      await saveClient(user.uid, {
         uid: user.uid,
         name: user.displayName || email.split('@')[0],
         email,
         stamps: 0,
         createdAt: new Date().toISOString()
       });
-      client = await getClient(id);
+      client = await getClient(user.uid);
     }
-    currentClientId = client.id;
+    currentClientId = user.uid;
     showClientCard(client);
   } catch(e) {
     const msgs = {
