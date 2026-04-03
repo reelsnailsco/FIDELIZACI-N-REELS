@@ -474,7 +474,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   </div>
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="switchAdminTab('clients',this)">Clientas</button>
-    <button class="admin-tab" onclick="switchAdminTab('new',this)">+ Nueva</button>
+    <button class="admin-tab" onclick="switchAdminTab('new',this)">+ Nueva clienta</button>
   </div>
   <div id="admin-panel-clients" class="admin-panel active">
    <div id="admin-stats" style="display:flex;gap:0.8rem;margin-bottom:1.2rem;"></div>
@@ -487,18 +487,41 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
     <div id="clients-list"><div class="loading-state"><div class="loading-spinner"></div>Cargando...</div></div>
   </div>
   <div id="admin-panel-new" class="admin-panel">
-    <p class="section-label">Agregar clienta manualmente</p>
-    <div class="new-client-form">
-      <p style="color:var(--gray);font-size:0.8rem;margin-bottom:1.2rem;line-height:1.5;">
-        Crea una tarjeta para una clienta sin que ella tenga que registrarse. Le puedes enviar el link por WhatsApp.
-      </p>
-      <div class="form-group">
-        <label class="form-label">Nombre de la clienta</label>
-        <input type="text" id="new-client-name" class="form-input" placeholder="Ej: Laura Martínez">
-      </div>
-      <button class="btn-primary" onclick="adminCreateClient()">Crear tarjeta sin cuenta ✦</button>
-      <p id="new-client-result" style="margin-top:0.8rem;font-size:0.8rem;color:var(--gray);"></p>
+  <p class="section-label">Registrar nueva clienta</p>
+  <div class="new-client-form">
+    <p style="color:var(--gray);font-size:0.8rem;margin-bottom:1.2rem;line-height:1.5;">
+      Pásale el teléfono a la clienta para que llene sus datos. Se creará su cuenta y podrá entrar desde su propio dispositivo después.
+    </p>
+    <div class="form-group">
+      <label class="form-label">Nombre completo *</label>
+      <input type="text" id="nc-name" class="form-input" placeholder="Ej: Laura Martínez" autocomplete="name">
     </div>
+    <div class="form-group">
+      <label class="form-label">Cédula *</label>
+      <input type="text" id="nc-cedula" class="form-input" placeholder="Número de cédula" inputmode="numeric">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Teléfono *</label>
+      <input type="tel" id="nc-phone" class="form-input" placeholder="Ej: 3001234567" inputmode="numeric" autocomplete="tel">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email *</label>
+      <input type="email" id="nc-email" class="form-input" placeholder="tu@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contraseña *</label>
+      <div class="pass-wrap">
+        <input type="password" id="nc-pass" class="form-input" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        <button type="button" class="pass-toggle" onclick="togglePass('nc-pass',this)" aria-label="Mostrar/ocultar contraseña" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <p id="nc-error" style="color:#ff6b6b;font-size:0.78rem;margin-bottom:0.8rem;display:none;"></p>
+    <button class="btn-primary" id="btn-nc" onclick="adminRegisterClient()">Crear mi cuenta ✦</button>
+    <p style="font-size:0.68rem;color:var(--gray);text-align:center;margin-top:0.8rem;">* Todos los campos son obligatorios</p>
   </div>
 </div>
 
@@ -561,6 +584,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   sendPasswordResetEmail,
   signOut,
   onAuthStateChanged
@@ -1061,22 +1085,59 @@ function filterClients(q) {
 function copyLink(url) {
   navigator.clipboard.writeText(url).then(() => showToast('Link copiado ✦', 'success'));
 }
-async function adminCreateClient() {
-  const name   = document.getElementById('new-client-name').value.trim();
-  const result = document.getElementById('new-client-result');
-  if (!name) { result.textContent = 'Escribe el nombre primero.'; return; }
-  result.textContent = 'Creando...';
-  const id = generateId();
-  await saveClient(id, { name, stamps: 0, createdAt: new Date().toISOString() });
-  const url = BASE_URL + '?c=' + id;
-  result.innerHTML = `✅ Creada. <a href="${url}" target="_blank" style="color:var(--pink)">Ver tarjeta</a>`;
-  document.getElementById('new-client-name').value = '';
-  setTimeout(() => { if (confirm(`¿Compartir el link de ${name} por WhatsApp?`)) shareLink(url, name); }, 300);
-}
-function shareLink(url, name) {
-  window.open('https://wa.me/?text=' + encodeURIComponent(
-    `Hola ${name}! 💅 Aquí está tu tarjeta de fidelización de Réels Nails Co: ${url}`
-  ), '_blank');
+async function adminRegisterClient() {
+  const name   = document.getElementById('nc-name').value.trim();
+  const cedula = document.getElementById('nc-cedula').value.trim();
+  const phone  = document.getElementById('nc-phone').value.trim();
+  const email  = document.getElementById('nc-email').value.trim();
+  const pass   = document.getElementById('nc-pass').value;
+  const errEl  = document.getElementById('nc-error');
+  const btn    = document.getElementById('btn-nc');
+
+  errEl.style.display = 'none';
+
+  if (!name)           { errEl.textContent = 'El nombre es obligatorio.';      errEl.style.display = 'block'; return; }
+  if (!cedula)         { errEl.textContent = 'La cédula es obligatoria.';      errEl.style.display = 'block'; return; }
+  if (!/^\d{5,12}$/.test(cedula)) { errEl.textContent = 'La cédula debe tener entre 5 y 12 números.'; errEl.style.display = 'block'; return; }
+  if (!phone)          { errEl.textContent = 'El teléfono es obligatorio.';    errEl.style.display = 'block'; return; }
+  if (!/^\d{7,15}$/.test(phone))  { errEl.textContent = 'El teléfono debe tener entre 7 y 15 números.'; errEl.style.display = 'block'; return; }
+  if (!email)          { errEl.textContent = 'El email es obligatorio.';       errEl.style.display = 'block'; return; }
+  if (pass.length < 6) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Creando cuenta…';
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, { displayName: name });
+    await saveClient(cred.user.uid, {
+      uid:       cred.user.uid,
+      name,
+      email,
+      phone,
+      cedula,
+      stamps:    0,
+      createdAt: new Date().toISOString()
+    });
+    // Limpiar campos
+    ['nc-name','nc-cedula','nc-phone','nc-email','nc-pass'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    // La clienta queda en su sesión y ve su tarjeta
+    const client = await getClient(cred.user.uid);
+    currentClientId = cred.user.uid;
+    showClientCard(client);
+    showToast('¡Cuenta creada exitosamente! 💅', 'success');
+  } catch(e) {
+    const msgs = {
+      'auth/email-already-in-use': 'Este email ya tiene una cuenta.',
+      'auth/invalid-email':        'El email no es válido.',
+      'auth/weak-password':        'La contraseña es muy débil.'
+    };
+    errEl.textContent = msgs[e.code] || 'Hubo un error. Intenta de nuevo.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Crear mi cuenta ✦';
+  }
 }
 async function requestStamp(clientId) {
   if (!auth.currentUser) { showToast('Sesión expirada.', 'error'); return; }
@@ -1144,7 +1205,7 @@ Object.assign(window, {
   openResetModal, closeResetModal, sendReset,
   registerClient, loginClient, clientLogout,
   checkAdminPass, adminLogout,
-  switchAdminTab, adminCreateClient, requestStamp, redeemReward, deleteClient,
+  switchAdminTab, adminRegisterClient, requestStamp, redeemReward, deleteClient,
   showClientQR, closeQRModal,
   doStamp, stampLogin,
   filterClients, copyLink
