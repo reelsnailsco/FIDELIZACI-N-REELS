@@ -613,6 +613,25 @@ let pendingStampClient = null;
 let currentClientId    = null;
 
 // ══════════════════════════════════════════
+// AUTO LOGOUT — 5 minutos de inactividad
+// ══════════════════════════════════════════
+let inactivityTimer;
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(async () => {
+    if (auth.currentUser && auth.currentUser.email !== ADMIN_EMAIL) {
+      await signOut(auth);
+      currentClientId = null;
+      showScreen('landing');
+      showToast('Sesión cerrada por inactividad', 'error');
+    }
+  }, 5 * 60 * 1000); // 5 minutos
+}
+['click','touchstart','keydown','scroll'].forEach(e =>
+  document.addEventListener(e, resetInactivityTimer)
+);
+
+// ══════════════════════════════════════════
 // TOGGLE CONTRASEÑA (OJO) — accesible desde HTML
 // ══════════════════════════════════════════
 const EYE_OPEN = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
