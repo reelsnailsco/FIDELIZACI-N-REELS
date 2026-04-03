@@ -849,6 +849,9 @@ async function loginClient() {
 
    let client = await getClient(user.uid);
     if (!client) {
+      client = await getClientByEmail(user.email);
+    }
+    if (!client) {
       await saveClient(user.uid, {
         uid: user.uid,
         name: user.displayName || email.split('@')[0],
