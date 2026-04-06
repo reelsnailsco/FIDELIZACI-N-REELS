@@ -280,7 +280,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
       <div class="pass-wrap">
         <input type="password" id="reg-pass" name="password" class="form-input"
                placeholder="Mínimo 6 caracteres"
-               autocomplete="new-password"
+                             autocomplete="off"
                onkeydown="if(event.key==='Enter')document.getElementById('reg-pass2').focus()">
         <button type="button" class="pass-toggle" onclick="togglePass('reg-pass',this)" aria-label="Mostrar/ocultar contraseña" tabindex="-1">
           <svg id="reg-pass-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -294,7 +294,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
       <div class="pass-wrap">
         <input type="password" id="reg-pass2" name="password2" class="form-input"
                placeholder="Escribe la contraseña de nuevo"
-               autocomplete="new-password"
+                             autocomplete="off"
                onkeydown="if(event.key==='Enter')registerClient()">
         <button type="button" class="pass-toggle" onclick="togglePass('reg-pass2',this)" aria-label="Mostrar/ocultar contraseña" tabindex="-1">
           <svg id="reg-pass2-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
