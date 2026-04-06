@@ -738,11 +738,6 @@ async function init() {
   }
 
   if (clientId) {
-    const client = await getClient(clientId);
-    if (client) { currentClientId = clientId; showClientCard(client); }
-    else showScreen('landing');
-    return;
-  }
 
   const unsub2 = onAuthStateChanged(auth, async user => {
     unsub2();
@@ -878,8 +873,11 @@ async function clientLogout() {
 // ══════════════════════════════════════════
 // TARJETA CLIENTA
 // ══════════════════════════════════════════
-function showClientCard(client) {
+  async function showClientCard(client) {
+  // Guardar el ID en localStorage para recordar la tarjeta
+  if (client.id) localStorage.setItem('reels_client_id', client.id);
   document.getElementById('card-client-name').textContent = client.name;
+
   document.getElementById('stamp-count').textContent      = client.stamps;
   renderStamps(client.stamps);
   document.getElementById('reward-box').style.display  = client.stamps >= 6 ? 'block' : 'none';
