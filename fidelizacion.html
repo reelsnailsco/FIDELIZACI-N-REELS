@@ -737,9 +737,22 @@ async function init() {
     return;
   }
 
-  if (clientId) {
+    if (clientId) {
+    const client = await getClient(clientId);
+    if (client) { currentClientId = clientId; showClientCard(client); }
+    else showScreen('landing');
+    return;
+  }
+
+  // Recordar tarjeta aunque no haya sesión activa
+  const savedId = localStorage.getItem('reels_client_id');
+  if (savedId) {
+    const client = await getClient(savedId);
+    if (client) { currentClientId = savedId; showClientCard(client); return; }
+  }
 
   const unsub2 = onAuthStateChanged(auth, async user => {
+
     unsub2();
     if (!user) { showScreen('landing'); return; }
     if (user.email === ADMIN_EMAIL) {
@@ -763,7 +776,7 @@ async function init() {
       currentClientId = id;
       const newClient = await getClient(id);
       showClientCard(newClient);
-    }
+       }
   });
 }
 
