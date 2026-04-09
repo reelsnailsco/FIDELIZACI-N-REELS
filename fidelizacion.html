@@ -880,6 +880,7 @@ async function loginClient() {
 async function clientLogout() {
   await signOut(auth);
   currentClientId = null;
+  localStorage.removeItem('reels_client_id');
   showScreen('landing');
 }
 
