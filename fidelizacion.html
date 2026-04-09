@@ -144,7 +144,9 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
 .card-greeting { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--pink); margin-bottom: 0.3rem; }
 .card-name { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 300; }
 .loyalty-card { background: linear-gradient(135deg, #1a0a12 0%, #0e0e0e 100%); border: 1px solid var(--border); border-radius: 1.5rem; padding: 2rem; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
-  @media (prefers-color-scheme: light) {
+.loyalty-card::before { content: '✦'; position: absolute; top: -20px; right: -10px; font-size: 8rem; color: rgba(233,30,140,0.06); line-height: 1; }
+
+@media (prefers-color-scheme: light) {
   html, body { background: #f5f0f3; color: #111; }
   .loyalty-card { background: linear-gradient(135deg, #1a0a12 0%, #111 100%); border: 1px solid rgba(233,30,140,0.3); }
   .loyalty-card .stamps-label { color: rgba(255,255,255,0.5); }
@@ -155,11 +157,11 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(-
   .form-card { background: #fff; border-color: rgba(233,30,140,0.15); }
   .form-input { background: #f5f0f3; border-color: rgba(0,0,0,0.1); color: #111; }
   .form-input::placeholder { color: #aaa; }
-  .client-count { color: #666; }
-  .back-btn { color: #666; }
+  .back-btn { color: #555; }
+  .landing-sub { color: rgba(0,0,0,0.4); }
+  .landing-title { color: #111; }
 }
 
-.loyalty-card::before { content: '✦'; position: absolute; top: -20px; right: -10px; font-size: 8rem; color: rgba(233,30,140,0.06); line-height: 1; }
 .stamps-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gray); margin-bottom: 1.2rem; }
 .stamps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; }
 .stamp { aspect-ratio: 1; border-radius: 50%; border: 2px dashed rgba(233,30,140,0.2); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.02); position: relative; overflow: hidden; }
